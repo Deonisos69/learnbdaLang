@@ -1,7 +1,8 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.7.10"
+    antlr
+    kotlin("jvm") version "1.8.0"
     application
 }
 
@@ -12,17 +13,28 @@ repositories {
     mavenCentral()
 }
 
-dependencies {
-    testImplementation(kotlin("test"))
-    implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.5")
+kotlin {
+    dependencies {
+        implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.5")
+    }
 }
 
-tasks.test {
-    useJUnitPlatform()
+dependencies {
+    antlr("org.antlr:antlr4:4.10.1")
+    implementation("org.antlr:antlr4-runtime:4.10.1")
+}
+
+tasks.generateGrammarSource {
+    arguments = arguments + listOf("-visitor", "-no-listener")
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions.jvmTarget = "17"
+    dependsOn("generateGrammarSource")
+    sourceSets["main"].kotlin {
+        srcDir("generated-src/antlr/main/")
+    }
+
 }
 
 application {
