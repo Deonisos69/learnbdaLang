@@ -1,6 +1,19 @@
 import java.lang.Exception
 
-class Evaluator() {
+sealed class Value() {
+    data class Int(val value: kotlin.Int) : Value()
+    data class Bool(val value: Boolean) : Value()
+    data class Text(val value: String) : Value()
+    data class Closure(val env: Env, val parameter: String, val body: Expression) : Value()
+}
+
+fun closureEvaluate(prog: Prog): Value {
+    return Evaluator(prog.defs).evaluate(emptyEnv, prog.expression)
+}
+
+class Evaluator(defs: List<Def>) {
+
+
     fun evaluate(env: Env, expression: Expression): Value {
         return when (expression) {
             is Expression.App -> {
@@ -10,14 +23,18 @@ class Evaluator() {
                         val newEnv = closure.env.put(closure.parameter, arg)
                         evaluate(newEnv, closure.body)
                     }
-                    is Value.Int, is Value.Bool -> throw Exception("$expression is not a function")
+                    is Value.Int, is Value.Bool, is Value.Text -> throw Exception("$expression is not a function")
                 }
             }
             is Expression.Lambda -> {
                 Value.Closure(env, expression.parameter, expression.body)
             }
             is Expression.Literal -> {
-                expression.value
+                return when (val primitive = expression.value) {
+                    is Primitive.Bool -> Value.Bool(primitive.value)
+                    is Primitive.Text -> Value.Text(primitive.value)
+                    is Primitive.Int -> Value.Int(primitive.value)
+                }
             }
             is Expression.Variable -> {
                 env[expression.name] ?: throw Exception("$expression is unbound")
@@ -44,6 +61,11 @@ class Evaluator() {
                     throw Exception("${expression.condition} has to be a Boolean")
                 }
 
+            }
+
+            is Expression.Let -> {
+                val bound = evaluate(env, expression.bound)
+                evaluate(env.put(expression.name, bound), expression.body)
             }
         }
     }

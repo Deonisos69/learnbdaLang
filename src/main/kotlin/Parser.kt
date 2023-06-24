@@ -2,17 +2,17 @@ import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 
 
-fun parseExpression(input: String): Expression {
-    val lexer = testLexer(CharStreams.fromString(input))
+fun parseFile(file: String): Prog {
+    val lexer = testLexer(CharStreams.fromFileName(file))
     val tokens = CommonTokenStream(lexer)
     val parser = testParser(tokens)
-    val expressions = mutableListOf<Expression>()
-
     val tree = parser.init()
-    return ExpressionVisitor(expressions).visit(tree)
+    val defs = mutableListOf<Def>()
+    val expression = ExpressionVisitor(defs).visit(tree)
+    return Prog(defs, expression)
 }
 
-class ExpressionVisitor(val expressions: MutableList<Expression>): testBaseVisitor<Expression>() {
+class ExpressionVisitor(val defs: MutableList<Def>): testBaseVisitor<Expression>() {
     override fun visitApp(ctx: testParser.AppContext): Expression {
         val function = this.visit(ctx.func)
         val argument = this.visit(ctx.arg)
@@ -26,16 +26,21 @@ class ExpressionVisitor(val expressions: MutableList<Expression>): testBaseVisit
     }
 
     override fun visitVar(ctx: testParser.VarContext): Expression {
-        return Expression.Variable(ctx.text)
+        return Expression.Variable(ctx.NAME().text)
     }
 
     override fun visitIntLit(ctx: testParser.IntLitContext): Expression {
-        return Expression.Literal(Value.Int(ctx.text.toInt()))
+        return Expression.Literal(Primitive.Int(ctx.INT().text.toInt()))
     }
 
     override fun visitBoolLit(ctx: testParser.BoolLitContext): Expression {
         val bool = ctx.BOOL().text == "true"
-        return Expression.Literal(Value.Bool(bool))
+        return Expression.Literal(Primitive.Bool(bool))
+    }
+
+    override fun visitTextLit(ctx: testParser.TextLitContext): Expression {
+        val text = ctx.TEXT().text
+        return Expression.Literal(Primitive.Text(text))
     }
 
     override fun visitBinary(ctx: testParser.BinaryContext): Expression {
@@ -58,6 +63,13 @@ class ExpressionVisitor(val expressions: MutableList<Expression>): testBaseVisit
         val then = this.visit(ctx.then)
         val else_ = this.visit(ctx.else_)
         return Expression.If(condition, then, else_)
+    }
+
+    override fun visitLet(ctx: testParser.LetContext): Expression {
+        val name = ctx.NAME().text
+        val bound = this.visit(ctx.bound)
+        val body = this.visit(ctx.body)
+        return Expression.Let(name, bound, body)
     }
 
 
