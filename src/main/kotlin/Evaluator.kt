@@ -20,7 +20,8 @@ fun closureEvaluate(prog: Prog): Value {
 }
 
 class Evaluator(defs: List<Def>) {
-    // Weiteres Environment über Env; Benutzt um BuiltIn Funktionen hinzuzufügen und Defs im Env zu speichern.
+    // Weiteres Environment über dem normalen Env
+    // Wird verwendet um BuiltIn Funktionen hinzuzufügen und Defs im Env zu speichern.
     var topLevel: PersistentMap<String, Value>
 
     init {
@@ -31,8 +32,9 @@ class Evaluator(defs: List<Def>) {
             // zu lösen. Wenn Arität kleiner als 2 ist, wird die BuiltInFunction an sich zurückgegeben
             val value = (2..builtIn.arity)
                 .map { "param$it" }
+                    // Fürs Erste nur Integer als Typ möglich
                 .fold<String, Expression>(Expression.BuiltInFunction(builtIn.name)) { acc, param ->
-                    Expression.Lambda(param, acc)
+                    Expression.Lambda(param, Type.Int, acc)
                 }
             // Füge die einzelnen BuiltInFunctions mit ihren Lambda Schachtelungen in eine Closure
             // und dann in ein eigenes Environment hinzu. Noch gibt es keine Möglichkeit diese Closure auszurechnen
@@ -81,6 +83,7 @@ class Evaluator(defs: List<Def>) {
                     Operator.Eq -> evaluateBinary<Value.Int>(left, right){ l, r -> Value.Bool(l.value == r.value)}
                     Operator.Or -> evaluateBinary<Value.Bool>(left, right){ l, r -> Value.Bool(l.value || r.value)}
                     Operator.And -> evaluateBinary<Value.Bool>(left, right){ l, r -> Value.Bool(l.value && r.value)}
+                    Operator.Concat -> evaluateBinary<Value.Text>(left, right){ l, r -> Value.Text(l.value + r.value)}
                 }
             }
             is Expression.If -> {

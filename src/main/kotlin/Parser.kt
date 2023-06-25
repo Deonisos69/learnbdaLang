@@ -12,10 +12,53 @@ fun parseFile(file: String): Prog {
     return Prog(defs, expression)
 }
 
+fun parseType(input: String): Type {
+    val lexer = testLexer(CharStreams.fromString(input))
+    val tokens = CommonTokenStream(lexer)
+    val parser = testParser(tokens)
+    return TypeVisitor().visit(parser.type())
+}
+
+class TypeVisitor(): testBaseVisitor<Type>() {
+
+    override fun visitFunctionType(ctx: testParser.FunctionTypeContext): Type {
+        val parameterType = visit(ctx.arg)
+        val resultType = visit(ctx.result)
+        return Type.Function(parameterType, resultType)
+    }
+
+    override fun visitBoolType(ctx: testParser.BoolTypeContext?): Type {
+        return Type.Bool
+    }
+
+    override fun visitIntType(ctx: testParser.IntTypeContext?): Type {
+        return Type.Int
+    }
+
+    override fun visitTextType(ctx: testParser.TextTypeContext?): Type {
+        return Type.Text
+    }
+
+    override fun visitParenthiszedType(ctx: testParser.ParenthiszedTypeContext): Type {
+        return visit(ctx.inner)
+    }
+}
+
 class ExpressionVisitor(val defs: MutableList<Def>): testBaseVisitor<Expression>() {
 
+    /**
+     * Liest name und parameter als Text ein, parsed den parameterType und resultType
+     * mithilfe des TypeVisitors, Schaut sich den Funktionskörper an und packt dann
+     * alle 3 Sachen in ein Def und fügt es dem TopLevel Environment hinzu.
+     */
     override fun visitDef(ctx: testParser.DefContext): Expression {
-        defs.add(Def(ctx.NAME().text, this.visit(ctx.expression())))
+        val name = ctx.name.text
+        val parameter = ctx.parameter.text
+        val parameterType = TypeVisitor().visit(ctx.parameterType)
+        val resultType = TypeVisitor().visit(ctx.resultType)
+        val body = this.visit(ctx.body)
+        val def = Def(name, Expression.Lambda(parameter, parameterType, body), Type.Function(parameterType, resultType))
+        defs.add(def)
         return super.visitDef(ctx)
     }
 
@@ -26,9 +69,10 @@ class ExpressionVisitor(val defs: MutableList<Def>): testBaseVisitor<Expression>
     }
 
     override fun visitLambda(ctx: testParser.LambdaContext): Expression {
-        val binder = ctx.NAME().text
+        val parameter = ctx.NAME().text
+        val parameterType = TypeVisitor().visit(ctx.parameterType)
         val body = this.visit(ctx.expression())
-        return Expression.Lambda(binder, body)
+        return Expression.Lambda(parameter, parameterType, body)
     }
 
     override fun visitVar(ctx: testParser.VarContext): Expression {
