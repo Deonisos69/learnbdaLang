@@ -1,6 +1,10 @@
 grammar test;
 
-init: expression;
+init: prog;
+
+prog: def* expression;
+
+def: 'def' NAME ':' expression ;
 
 expression
     : atom #Unary
@@ -20,6 +24,7 @@ atom
     | 'function' NAME '=' '{' func=expression '}' '(' arg=atom ')' #App
     | 'if' condition=expression 'then' then=expression 'else' else=expression #If
     | 'let' NAME '=' bound=expression 'in' body=expression #Let
+    | '(' inner=expression ')' #Parenthesized
     ;
 
 TEXT: '"' ~('"')* '"';

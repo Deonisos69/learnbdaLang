@@ -1,3 +1,4 @@
-let y = 13 in
-let z = 1 in
-function test = { lambda x => 20 + x + y + z } (14)
+def hi :
+ if (2 + 2 == 4) then true else false
+
+hi

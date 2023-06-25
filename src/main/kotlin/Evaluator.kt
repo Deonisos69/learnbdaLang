@@ -1,3 +1,5 @@
+import kotlinx.collections.immutable.PersistentMap
+import kotlinx.collections.immutable.persistentMapOf
 import java.lang.Exception
 
 sealed class Value() {
@@ -12,7 +14,15 @@ fun closureEvaluate(prog: Prog): Value {
 }
 
 class Evaluator(defs: List<Def>) {
+    // Weiteres Environment über Env; Benutzt um BuiltIn Funktionen hinzuzufügen und Defs im Env zu speichern.
+    var topLevel: PersistentMap<String, Value>
 
+    init {
+        topLevel = persistentMapOf()
+        defs.forEach {
+            topLevel = topLevel.put(it.name, evaluate(emptyEnv, it.expression))
+        }
+    }
 
     fun evaluate(env: Env, expression: Expression): Value {
         return when (expression) {
@@ -23,7 +33,7 @@ class Evaluator(defs: List<Def>) {
                         val newEnv = closure.env.put(closure.parameter, arg)
                         evaluate(newEnv, closure.body)
                     }
-                    is Value.Int, is Value.Bool, is Value.Text -> throw Exception("$expression is not a function")
+                    is Value.Int, is Value.Bool, is Value.Text -> throw Exception("$closure is not a function")
                 }
             }
             is Expression.Lambda -> {
@@ -37,7 +47,9 @@ class Evaluator(defs: List<Def>) {
                 }
             }
             is Expression.Variable -> {
-                env[expression.name] ?: throw Exception("$expression is unbound")
+                env[expression.name]
+                    ?: topLevel[expression.name]
+                    ?: throw Exception("$expression is unbound")
             }
             is Expression.Binary -> {
                 val left = evaluate(env, expression.left)
@@ -46,7 +58,7 @@ class Evaluator(defs: List<Def>) {
                     Operator.Add -> evaluateBinary<Value.Int>(left, right){ l, r -> Value.Int(l.value + r.value)}
                     Operator.Sub -> evaluateBinary<Value.Int>(left, right){ l, r -> Value.Int(l.value - r.value)}
                     Operator.Mul -> evaluateBinary<Value.Int>(left, right){ l, r -> Value.Int(l.value * r.value)}
-                    Operator.Eq -> evaluateBinary<Value.Bool>(left, right){ l, r -> Value.Bool(l.value == r.value)}
+                    Operator.Eq -> evaluateBinary<Value.Int>(left, right){ l, r -> Value.Bool(l.value == r.value)}
                     Operator.Or -> evaluateBinary<Value.Bool>(left, right){ l, r -> Value.Bool(l.value || r.value)}
                     Operator.And -> evaluateBinary<Value.Bool>(left, right){ l, r -> Value.Bool(l.value && r.value)}
                 }

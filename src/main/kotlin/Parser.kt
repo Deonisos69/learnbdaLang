@@ -13,6 +13,12 @@ fun parseFile(file: String): Prog {
 }
 
 class ExpressionVisitor(val defs: MutableList<Def>): testBaseVisitor<Expression>() {
+
+    override fun visitDef(ctx: testParser.DefContext): Expression {
+        defs.add(Def(ctx.NAME().text, this.visit(ctx.expression())))
+        return super.visitDef(ctx)
+    }
+
     override fun visitApp(ctx: testParser.AppContext): Expression {
         val function = this.visit(ctx.func)
         val argument = this.visit(ctx.arg)
@@ -41,6 +47,10 @@ class ExpressionVisitor(val defs: MutableList<Def>): testBaseVisitor<Expression>
     override fun visitTextLit(ctx: testParser.TextLitContext): Expression {
         val text = ctx.TEXT().text
         return Expression.Literal(Primitive.Text(text))
+    }
+
+    override fun visitParenthesized(ctx: testParser.ParenthesizedContext): Expression {
+        return this.visit(ctx.inner)
     }
 
     override fun visitBinary(ctx: testParser.BinaryContext): Expression {
