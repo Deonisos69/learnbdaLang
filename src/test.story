@@ -1,4 +1,5 @@
 def hi :
- if (2 + 2 == 4) then true else false
+ let x = 3 in
+ fun x => x + 5
 
 hi

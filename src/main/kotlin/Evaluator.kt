@@ -1,5 +1,8 @@
+@file:Suppress("LanguageDetectionInspection")
+
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.collections.immutable.toPersistentMap
 import java.lang.Exception
 
 sealed class Value() {
@@ -8,6 +11,9 @@ sealed class Value() {
     data class Text(val value: String) : Value()
     data class Closure(val env: Env, val parameter: String, val body: Expression) : Value()
 }
+
+typealias Env = PersistentMap<String, Value>
+val emptyEnv: Env = persistentMapOf()
 
 fun closureEvaluate(prog: Prog): Value {
     return Evaluator(prog.defs).evaluate(emptyEnv, prog.expression)
@@ -18,7 +24,21 @@ class Evaluator(defs: List<Def>) {
     var topLevel: PersistentMap<String, Value>
 
     init {
-        topLevel = persistentMapOf()
+        val topLevelMut = mutableMapOf<String, Value>()
+        builtIns.forEach { builtIn ->
+            // Für jede BuiltInFunction: Sobald die Arität größer als 2 ist werden Lambda Funktionen
+            // um die BuiltIn Funktion geschachtelt. -> Currying um Funktionen mit mehreren Parametern
+            // zu lösen. Wenn Arität kleiner als 2 ist, wird die BuiltInFunction an sich zurückgegeben
+            val value = (2..builtIn.arity)
+                .map { "param$it" }
+                .fold<String, Expression>(Expression.BuiltInFunction(builtIn.name)) { acc, param ->
+                    Expression.Lambda(param, acc)
+                }
+            // Füge die einzelnen BuiltInFunctions mit ihren Lambda Schachtelungen in eine Closure
+            // und dann in ein eigenes Environment hinzu. Noch gibt es keine Möglichkeit diese Closure auszurechnen
+            topLevelMut[builtIn.name] = Value.Closure(emptyEnv, "param1", value)
+        }
+        topLevel = topLevelMut.toPersistentMap()
         defs.forEach {
             topLevel = topLevel.put(it.name, evaluate(emptyEnv, it.expression))
         }
@@ -79,6 +99,16 @@ class Evaluator(defs: List<Def>) {
                 val bound = evaluate(env, expression.bound)
                 evaluate(env.put(expression.name, bound), expression.body)
             }
+
+            is Expression.BuiltInFunction ->
+                return when(expression.name) {
+                    "int_to_string" -> {
+                        val int = env["param1"]!! as? Value.Int ?: throw Error("Expected an Int")
+                        Value.Text(int.value.toString())
+                    }
+                    else -> throw Error("Unknown function: ${expression.name}")
+                }
+
         }
     }
 }

@@ -20,8 +20,8 @@ atom
     | INT #IntLit
     | BOOL #BoolLit
     | TEXT #TextLit
-    | 'lambda' NAME '=>' expression #Lambda
-    | 'function' NAME '=' '{' func=expression '}' '(' arg=atom ')' #App
+    | 'fun' NAME '=>' expression #Lambda
+    | func=atom '(' arg=expression ')' #App
     | 'if' condition=expression 'then' then=expression 'else' else=expression #If
     | 'let' NAME '=' bound=expression 'in' body=expression #Let
     | '(' inner=expression ')' #Parenthesized

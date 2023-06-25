@@ -1,9 +1,3 @@
-import kotlinx.collections.immutable.PersistentMap
-import kotlinx.collections.immutable.persistentMapOf
-
-typealias Env = PersistentMap<String, Value>
-val emptyEnv: Env = persistentMapOf()
-
 data class Prog(val defs: List<Def>, val expression: Expression)
 data class Def(val name: String, val expression: Expression)
 
@@ -15,6 +9,7 @@ sealed class Expression() {
     data class Binary(val left: Expression, val operator: Operator, val right: Expression): Expression()
     data class If(val condition: Expression, val thenBranch: Expression, val elseBranch: Expression): Expression()
     data class Let(val name: String, val bound: Expression, val body: Expression): Expression()
+    data class BuiltInFunction(val name: String): Expression()
 }
 
 enum class Operator {
