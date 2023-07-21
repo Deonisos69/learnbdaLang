@@ -1,130 +1,69 @@
+import org.antlr.v4.runtime.tree.ErrorNode
+import org.antlr.v4.runtime.tree.ParseTree
+import org.antlr.v4.runtime.tree.RuleNode
+import org.antlr.v4.runtime.tree.TerminalNode
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 
 
-fun parseFile(file: String): Prog {
-    val lexer = testLexer(CharStreams.fromFileName(file))
-    val tokens = CommonTokenStream(lexer)
-    val parser = testParser(tokens)
-    val tree = parser.init()
-    val defs = mutableListOf<Def>()
-    val expression = ExpressionVisitor(defs).visit(tree)
-    return Prog(defs, expression)
-}
+//fun parseFile(file: String): Prog {
+//    val lexer = testLexer(CharStreams.fromFileName(file))
+//    val tokens = CommonTokenStream(lexer)
+//    val parser = testParser(tokens)
+//    val tree = parser.init()
+//    val defs = mutableListOf<Def>()
+//    val expression = ExpressionVisitor(defs).visit(tree)
+//    return Prog(defs, expression)
+//}
 
-fun parseType(input: String): Type {
-    val lexer = testLexer(CharStreams.fromString(input))
-    val tokens = CommonTokenStream(lexer)
-    val parser = testParser(tokens)
-    return TypeVisitor().visit(parser.type())
-}
-
-class TypeVisitor(): testBaseVisitor<Type>() {
-
-    override fun visitFunctionType(ctx: testParser.FunctionTypeContext): Type {
-        val parameterType = visit(ctx.arg)
-        val resultType = visit(ctx.result)
-        return Type.Function(parameterType, resultType)
+class ExpressionVisitor() : learnbdaLangBaseVisitor<Expression>() {
+    override fun visitBOOL(ctx: learnbdaLangParser.BOOLContext): Expression {
+        return super.visitBOOL(ctx)
     }
 
-    override fun visitBoolType(ctx: testParser.BoolTypeContext?): Type {
-        return Type.Bool
+    override fun visitINT(ctx: learnbdaLangParser.INTContext): Expression {
+        val int = ctx.INT().text.toInt()
+        return Expression.Literal(Primitive.Int(int))
     }
 
-    override fun visitIntType(ctx: testParser.IntTypeContext?): Type {
-        return Type.Int
+    override fun visitSTRING(ctx: learnbdaLangParser.STRINGContext): Expression {
+        return Expression.Literal(Primitive.String(ctx.STRING().text.trimStart('"').trimEnd('"').replace("\\n", "\n")))
     }
 
-    override fun visitTextType(ctx: testParser.TextTypeContext?): Type {
-        return Type.Text
+    override fun visitVariable(ctx: learnbdaLangParser.VariableContext): Expression {
+        return Expression.Variable(LocallyNamelessVariable.FreeVariable(ctx.NAME().text))
     }
 
-    override fun visitParenthiszedType(ctx: testParser.ParenthiszedTypeContext): Type {
-        return visit(ctx.inner)
-    }
-}
-
-class ExpressionVisitor(val defs: MutableList<Def>): testBaseVisitor<Expression>() {
-
-    /**
-     * Liest name und parameter als Text ein, parsed den parameterType und resultType
-     * mithilfe des TypeVisitors, Schaut sich den Funktionskörper an und packt dann
-     * alle 3 Sachen in ein Def und fügt es dem TopLevel Environment hinzu.
-     */
-    override fun visitDef(ctx: testParser.DefContext): Expression {
-        val name = ctx.name.text
-        val parameter = ctx.parameter.text
-        val parameterType = TypeVisitor().visit(ctx.parameterType)
-        val resultType = TypeVisitor().visit(ctx.resultType)
-        val body = this.visit(ctx.body)
-        val def = Def(name, Expression.Lambda(parameter, parameterType, body), Type.Function(parameterType, resultType))
-        defs.add(def)
-        return super.visitDef(ctx)
-    }
-
-    override fun visitApp(ctx: testParser.AppContext): Expression {
-        val function = this.visit(ctx.func)
-        val argument = this.visit(ctx.arg)
-        return Expression.App(function, argument)
-    }
-
-    override fun visitLambda(ctx: testParser.LambdaContext): Expression {
-        val parameter = ctx.NAME().text
-        val parameterType = TypeVisitor().visit(ctx.parameterType)
-        val body = this.visit(ctx.expression())
-        return Expression.Lambda(parameter, parameterType, body)
-    }
-
-    override fun visitVar(ctx: testParser.VarContext): Expression {
-        return Expression.Variable(ctx.NAME().text)
-    }
-
-    override fun visitIntLit(ctx: testParser.IntLitContext): Expression {
-        return Expression.Literal(Primitive.Int(ctx.INT().text.toInt()))
-    }
-
-    override fun visitBoolLit(ctx: testParser.BoolLitContext): Expression {
-        val bool = ctx.BOOL().text == "true"
-        return Expression.Literal(Primitive.Bool(bool))
-    }
-
-    override fun visitTextLit(ctx: testParser.TextLitContext): Expression {
-        val text = ctx.TEXT().text
-        return Expression.Literal(Primitive.Text(text))
-    }
-
-    override fun visitParenthesized(ctx: testParser.ParenthesizedContext): Expression {
-        return this.visit(ctx.inner)
-    }
-
-    override fun visitBinary(ctx: testParser.BinaryContext): Expression {
+    override fun visitBinary(ctx: learnbdaLangParser.BinaryContext): Expression {
         val left = this.visit(ctx.left)
-        val operator = when(ctx.getChild(1).text) {
-            "+" -> Operator.Add
-            "-" -> Operator.Sub
-            "*" -> Operator.Mul
-            "==" -> Operator.Eq
-            "||" -> Operator.Or
-            "&&" -> Operator.And
-            else -> throw Error("Unknown operator")
+        val operator = when (ctx.operator.text) {
+            "+" -> Operator.PLUS
+            "-" -> Operator.MINUS
+            "*" -> Operator.MULTIPLY
+            "/" -> Operator.DIVIDE
+            "==" -> Operator.EQUALS
+            "&&" -> Operator.AND
+            "||" -> Operator.OR
+            else -> throw Exception("Ik weiß nicht wat du von mir willst")
         }
         val right = this.visit(ctx.right)
         return Expression.Binary(left, operator, right)
     }
 
-    override fun visitIf(ctx: testParser.IfContext): Expression {
-        val condition = this.visit(ctx.condition)
-        val then = this.visit(ctx.then)
-        val else_ = this.visit(ctx.else_)
-        return Expression.If(condition, then, else_)
+    override fun visitApp(ctx: learnbdaLangParser.AppContext): Expression {
+        val function = this.visit(ctx.function)
+        val argument = this.visit(ctx.argument)
+        return Expression.App(function, argument)
     }
 
-    override fun visitLet(ctx: testParser.LetContext): Expression {
-        val name = ctx.NAME().text
-        val bound = this.visit(ctx.bound)
+    override fun visitParenthesized(ctx: learnbdaLangParser.ParenthesizedContext): Expression {
+        return this.visit(ctx.inner)
+    }
+
+    override fun visitLambda(ctx: learnbdaLangParser.LambdaContext): Expression {
+        val parameter = ctx.param.text
         val body = this.visit(ctx.body)
-        return Expression.Let(name, bound, body)
+        return Expression.Lambda(Expression.Variable(LocallyNamelessVariable.FreeVariable(parameter)), body)
     }
-
 
 }
