@@ -5,10 +5,10 @@ import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toPersistentMap
 import java.lang.IllegalArgumentException
 
-typealias Env = PersistentMap<LocallyNamelessVariable, Value>
+typealias Env = PersistentMap<String, Value>
 val emptyEnv: Env = persistentMapOf()
 
-typealias ExpressionEnv = PersistentMap<LocallyNamelessVariable, Expression>
+typealias ExpressionEnv = PersistentMap<Int, Expression>
 val emptyExpressionEnv: Env = persistentMapOf()
 
 typealias  namelessMap = PersistentMap<LocallyNamelessVariable.FreeVariable, LocallyNamelessVariable.BoundVariable>
@@ -25,65 +25,66 @@ sealed class Value() {
 
 class Evaluator() {
 
-    fun evaluate(environment: Env, expression: Expression, depth: Int) : Value {
-
-        return when (val self = expression) {
-            is Expression.App -> {
-                val left = evaluate(environment ,self.func, depth)
-                if (left is Value.Closure) {
-                    val right = evaluate(environment, self.arg, depth)
-
-                    val newEnvironment = shift(environment).put(LocallyNamelessVariable.BoundVariable(0), right)
-                    evaluate(newEnvironment, left.body, depth + 1)
-                } else {
-                    throw IllegalArgumentException("$self is not a function. Can only apply functions")
-                }
-            }
-            is Expression.Lambda -> Value.Closure(environment, Expression.Variable(LocallyNamelessVariable.FreeVariable("hey")), self.body)
-            is Expression.Literal -> when (self.primitive) {
-                is Primitive.Bool -> Value.Bool(self.primitive.value)
-                is Primitive.Int -> Value.Int(self.primitive.value)
-                is Primitive.String -> Value.String(self.primitive.value)
-            }
-            is Expression.Variable -> (
-                when (self.variable) {
-                    is LocallyNamelessVariable.BoundVariable -> {
-                        environment[LocallyNamelessVariable.BoundVariable(depth)]
-                            ?: throw Exception("Variable not found")
-                    }
-                    is LocallyNamelessVariable.FreeVariable -> throw Exception("Can't evaluate a free variable!")
-                }
-            )
-
-            is Expression.Binary -> {
-                val left = evaluate(environment, self.left, depth)
-                val right = evaluate(environment, self.right, depth)
-                when (self.operator) {
-                    Operator.PLUS -> evaluateBinary<Value.Int>(left, right) { l, r -> Value.Int(l.value + r.value) }
-                    Operator.MINUS -> evaluateBinary<Value.Int>(left, right) { l, r -> Value.Int(l.value - r.value) }
-                    Operator.MULTIPLY -> evaluateBinary<Value.Int>(left, right) { l, r -> Value.Int(l.value * r.value) }
-                    Operator.DIVIDE -> evaluateBinary<Value.Int>(left, right) { l, r -> Value.Int(l.value / r.value) }
-                    Operator.EQUALS -> evaluateBinary<Value.Bool>(left, right) { l, r -> Value.Bool(l.value == r.value) }
-                    Operator.AND -> evaluateBinary<Value.Bool>(left, right) { l, r -> Value.Bool(l.value && r.value) }
-                    Operator.OR -> evaluateBinary<Value.Bool>(left, right) { l, r -> Value.Bool(l.value || r.value) }
-
-                }
-            }
-        }
-    }
+//    fun evaluate(environment: Env, expression: Expression, depth: Int) : Value {
+//
+//        return when (val self = expression) {
+//            is Expression.App -> {
+//                val left = evaluate(environment ,self.func, depth)
+//                if (left is Value.Closure) {
+//                    val right = evaluate(environment, self.arg, depth)
+//
+//                    val newEnvironment = shift(environment).put(LocallyNamelessVariable.BoundVariable(0), right)
+//                    evaluate(newEnvironment, left.body, depth + 1)
+//                } else {
+//                    throw IllegalArgumentException("$self is not a function. Can only apply functions")
+//                }
+//            }
+//            is Expression.Lambda -> Value.Closure(environment, Expression.Variable(LocallyNamelessVariable.FreeVariable("hey")), self.body)
+//            is Expression.Literal -> when (self.primitive) {
+//                is Primitive.Bool -> Value.Bool(self.primitive.value)
+//                is Primitive.Int -> Value.Int(self.primitive.value)
+//                is Primitive.String -> Value.String(self.primitive.value)
+//            }
+//            is Expression.Variable -> (
+//                when (self.variable) {
+//                    is LocallyNamelessVariable.BoundVariable -> {
+//                        environment[LocallyNamelessVariable.BoundVariable(depth)]
+//                            ?: throw Exception("Variable not found")
+//                    }
+//                    is LocallyNamelessVariable.FreeVariable -> throw Exception("Can't evaluate a free variable!")
+//                }
+//            )
+//
+//            is Expression.Binary -> {
+//                val left = evaluate(environment, self.left, depth)
+//                val right = evaluate(environment, self.right, depth)
+//                when (self.operator) {
+//                    Operator.PLUS -> evaluateBinary<Value.Int>(left, right) { l, r -> Value.Int(l.value + r.value) }
+//                    Operator.MINUS -> evaluateBinary<Value.Int>(left, right) { l, r -> Value.Int(l.value - r.value) }
+//                    Operator.MULTIPLY -> evaluateBinary<Value.Int>(left, right) { l, r -> Value.Int(l.value * r.value) }
+//                    Operator.DIVIDE -> evaluateBinary<Value.Int>(left, right) { l, r -> Value.Int(l.value / r.value) }
+//                    Operator.EQUALS -> evaluateBinary<Value.Bool>(left, right) { l, r -> Value.Bool(l.value == r.value) }
+//                    Operator.AND -> evaluateBinary<Value.Bool>(left, right) { l, r -> Value.Bool(l.value && r.value) }
+//                    Operator.OR -> evaluateBinary<Value.Bool>(left, right) { l, r -> Value.Bool(l.value || r.value) }
+//
+//                }
+//            }
+//        }
+//    }
 
 
     inline fun <reified T> evaluateBinary(left: Value, right: Value, f: (T, T) -> Value): Value = f(left as T, right as T)
 
 
-    fun toDeBrujin(expression: Expression, indexes: List<LocallyNamelessVariable.FreeVariable> = listOf()) : Expression {
+    fun toDeBrujin(expression: Expression, indexes: List<String> = listOf()) : Expression {
         return when (val self = expression) {
             is Expression.App -> {
                 Expression.App(toDeBrujin(self.func, indexes), toDeBrujin(self.arg, indexes))
             }
             is Expression.Binary -> Expression.Binary(toDeBrujin(self.left, indexes), self.operator, toDeBrujin(self.right, indexes))
             is Expression.Lambda -> {
-                val newIndexes = indexes.plusElement(self.variable.variable as LocallyNamelessVariable.FreeVariable)
+                self.variable.variable as LocallyNamelessVariable.FreeVariable
+                val newIndexes = indexes.plusElement(self.variable.variable.name)
                 val goDeeper = toDeBrujin(self.body, indexes)
                 Expression.Lambda(Expression.Variable(LocallyNamelessVariable.BoundVariable(newIndexes.size - 1)), goDeeper)
             }
@@ -91,7 +92,7 @@ class Evaluator() {
             is Expression.Variable -> when (self.variable) {
                 is LocallyNamelessVariable.BoundVariable -> self
                 is LocallyNamelessVariable.FreeVariable -> {
-                    if (indexes.contains(self.variable)) Expression.Variable(LocallyNamelessVariable.BoundVariable(indexes.reversed().indexOf(self.variable))) else self
+                    if (indexes.contains(self.variable.name)) Expression.Variable(LocallyNamelessVariable.BoundVariable(indexes.reversed().indexOf(self.variable.name))) else self
                 }
             }
         }
@@ -118,55 +119,35 @@ class Evaluator() {
                 self.variable as LocallyNamelessVariable.BoundVariable
                 val pointsTo = self.variable.index - depth
                 if (pointsTo == 0) Expression.Variable(
-                    LocallyNamelessVariable.FreeVariable((depth - self.variable.index).toString())
+                    LocallyNamelessVariable.FreeVariable((depth - 1 - self.variable.index).toString())
                 ) else self
             }
         }
     }
-    //
+    // Just normalize every bound variable
     fun locallyNamelessEvaluate(environment: ExpressionEnv, expression: Expression, depth: Int): Expression {
         return when (val self = expression) {
             is Expression.App -> {
                 if (self.func is Expression.Lambda) {
                     val right = locallyNamelessEvaluate(environment, self.arg, depth)
-                    val newEnvironment : ExpressionEnv = environment.put(self.func.variable.variable, right)
-                    locallyNamelessEvaluate(newEnvironment, self.func.body, depth)
+                    val newEnvironment : ExpressionEnv = environment.put(depth, right)
+                    locallyNamelessEvaluate(newEnvironment, self.func, depth)
                     } else throw Exception("${self.func} is not a lambda")
                 }
             is Expression.Lambda -> {
-
+                Expression.Lambda(self.variable, locallyNamelessEvaluate(environment, self.body, depth + 1))
             }
 
 
             is Expression.Literal -> self
             is Expression.Variable -> when (self.variable) {
-                is LocallyNamelessVariable.BoundVariable -> environment[]
+                is LocallyNamelessVariable.BoundVariable -> environment[self.variable.index + depth] ?: throw Exception("unbound variable")
                 is LocallyNamelessVariable.FreeVariable -> self
             }
 
             is Expression.Binary ->
-
+                Expression.Binary(locallyNamelessEvaluate(environment, self.left, depth), self.operator, locallyNamelessEvaluate(environment, self.right, depth))
         }
             }
-
-    fun shift(environment: Env): Env {
-        val newEnvironment = mutableMapOf<LocallyNamelessVariable, Value>()
-        for (variable in environment) {
-            val locallyNamelessVariable = variable.key
-            if (locallyNamelessVariable is LocallyNamelessVariable.BoundVariable) {
-                newEnvironment[LocallyNamelessVariable.BoundVariable(locallyNamelessVariable.index + 1)] =
-                    variable.value
-            } else {
-                newEnvironment[variable.key] = variable.value
-            }
-        }
-        return newEnvironment.toPersistentMap()
-    }
-
-    fun getBoundVariableValueByIndex(environment: Env, index: Int) : Value {
-        return environment.entries.first { (key, value) ->
-            key is LocallyNamelessVariable.BoundVariable && key.index == index
-         }.value
-    }
     }
 
